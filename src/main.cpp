@@ -29,7 +29,7 @@ int main(int argc, char **argv)
 
     // 读取图像和点云
     cv::Mat img_input = dataPreprocessPtr->img_input_;
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_input = dataPreprocessPtr->cloud_input_;
+    pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_input = dataPreprocessPtr->cloud_input_;
     
     // 检测 QR 码
     PointCloud<PointXYZ>::Ptr qr_center_cloud(new PointCloud<PointXYZ>);
@@ -69,6 +69,13 @@ int main(int argc, char **argv)
 
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr colored_cloud(new pcl::PointCloud<pcl::PointXYZRGB>);
     projectPointCloudToImage(cloud_input, transformation, qrDetectPtr->cameraMatrix_, qrDetectPtr->distCoeffs_, img_input, colored_cloud);
+
+    cloud_input->width = static_cast<uint32_t>(cloud_input->points.size());
+    cloud_input->height = 1;
+    if (pcl::io::savePCDFileASCII(params.output_path + "/cloud_input.pcd", *cloud_input) == 0) 
+    {
+      std::cout << BOLDYELLOW << "[Result] Saved input point cloud to: " << BOLDWHITE << params.output_path << "/cloud_input.pcd" << RESET << std::endl;
+    } 
 
     saveCalibrationResults(params, transformation, colored_cloud, qrDetectPtr->imageCopy_);
 

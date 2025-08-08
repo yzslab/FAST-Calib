@@ -22,10 +22,10 @@ private:
     double circle_radius_;
 
     // 存储中间结果的点云
-    pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud_;
-    pcl::PointCloud<pcl::PointXYZ>::Ptr plane_cloud_;
-    pcl::PointCloud<pcl::PointXYZ>::Ptr aligned_cloud_;
-    pcl::PointCloud<pcl::PointXYZ>::Ptr edge_cloud_;
+    pcl::PointCloud<pcl::PointXYZI>::Ptr filtered_cloud_;
+    pcl::PointCloud<pcl::PointXYZI>::Ptr plane_cloud_;
+    pcl::PointCloud<pcl::PointXYZI>::Ptr aligned_cloud_;
+    pcl::PointCloud<pcl::PointXYZI>::Ptr edge_cloud_;
     pcl::PointCloud<pcl::PointXYZ>::Ptr center_z0_cloud_;
 
 public:
@@ -37,10 +37,10 @@ public:
     ros::Publisher center_pub_;
 
     LidarDetect(ros::NodeHandle &nh, Params &params)
-        : filtered_cloud_(new pcl::PointCloud<pcl::PointXYZ>),
-          plane_cloud_(new pcl::PointCloud<pcl::PointXYZ>),
-          aligned_cloud_(new pcl::PointCloud<pcl::PointXYZ>),
-          edge_cloud_(new pcl::PointCloud<pcl::PointXYZ>),
+        : filtered_cloud_(new pcl::PointCloud<pcl::PointXYZI>),
+          plane_cloud_(new pcl::PointCloud<pcl::PointXYZI>),
+          aligned_cloud_(new pcl::PointCloud<pcl::PointXYZI>),
+          edge_cloud_(new pcl::PointCloud<pcl::PointXYZI>),
           center_z0_cloud_(new pcl::PointCloud<pcl::PointXYZ>)
     {
         x_min_ = params.x_min;
@@ -59,24 +59,24 @@ public:
         center_pub_ = nh.advertise<sensor_msgs::PointCloud2>("center_cloud", 10);
     }
 
-    void detect_lidar(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::PointCloud<pcl::PointXYZ>::Ptr center_cloud)
+    void detect_lidar(pcl::PointCloud<pcl::PointXYZI>::Ptr cloud, pcl::PointCloud<pcl::PointXYZ>::Ptr center_cloud)
     {
         // 1. X、Y、Z方向滤波
         filtered_cloud_->reserve(cloud->size());
 
-        pcl::PassThrough<pcl::PointXYZ> pass_x;
+        pcl::PassThrough<pcl::PointXYZI> pass_x;
         pass_x.setInputCloud(cloud);
         pass_x.setFilterFieldName("x");
         pass_x.setFilterLimits(x_min_, x_max_);  // 设置X轴范围
         pass_x.filter(*filtered_cloud_);
     
-        pcl::PassThrough<pcl::PointXYZ> pass_y;
+        pcl::PassThrough<pcl::PointXYZI> pass_y;
         pass_y.setInputCloud(filtered_cloud_);
         pass_y.setFilterFieldName("y");
         pass_y.setFilterLimits(y_min_, y_max_);  // 设置Y轴范围
         pass_y.filter(*filtered_cloud_);
     
-        pcl::PassThrough<pcl::PointXYZ> pass_z;
+        pcl::PassThrough<pcl::PointXYZI> pass_z;
         pass_z.setInputCloud(filtered_cloud_);
         pass_z.setFilterFieldName("z");
         pass_z.setFilterLimits(z_min_, z_max_);  // 设置Z轴范围
@@ -84,7 +84,7 @@ public:
     
         ROS_INFO("Filtered cloud size: %ld", filtered_cloud_->size());
         
-        pcl::VoxelGrid<pcl::PointXYZ> voxel_filter;
+        pcl::VoxelGrid<pcl::PointXYZI> voxel_filter;
         voxel_filter.setInputCloud(filtered_cloud_);
         voxel_filter.setLeafSize(0.005f, 0.005f, 0.005f);
         voxel_filter.filter(*filtered_cloud_);
@@ -95,14 +95,14 @@ public:
 
         pcl::ModelCoefficients::Ptr plane_coefficients(new pcl::ModelCoefficients);
         pcl::PointIndices::Ptr plane_inliers(new pcl::PointIndices);
-        pcl::SACSegmentation<pcl::PointXYZ> plane_segmentation;
+        pcl::SACSegmentation<pcl::PointXYZI> plane_segmentation;
         plane_segmentation.setModelType(pcl::SACMODEL_PLANE);
         plane_segmentation.setMethodType(pcl::SAC_RANSAC);
         plane_segmentation.setDistanceThreshold(0.01);  // 平面分割阈值
         plane_segmentation.setInputCloud(filtered_cloud_);
         plane_segmentation.segment(*plane_inliers, *plane_coefficients);
     
-        pcl::ExtractIndices<pcl::PointXYZ> extract;
+        pcl::ExtractIndices<pcl::PointXYZI> extract;
         extract.setInputCloud(filtered_cloud_);
         extract.setIndices(plane_inliers);
         extract.filter(*plane_cloud_);
@@ -129,7 +129,12 @@ public:
         for (const auto& pt : *plane_cloud_) {
             Eigen::Vector3d point(pt.x, pt.y, pt.z);
             Eigen::Vector3d aligned_point = R * point;
-            aligned_cloud_->push_back(pcl::PointXYZ(aligned_point.x(), aligned_point.y(), 0.0));
+            auto p = pcl::PointXYZI();
+            p.x = aligned_point.x();
+            p.y = aligned_point.y();
+            p.z = 0.0;
+            p.intensity = pt.intensity;
+            aligned_cloud_->push_back(p);
             average_z += aligned_point.z();
             cnt++;
         }
@@ -138,14 +143,14 @@ public:
         // 4. 提取边缘点
         edge_cloud_->reserve(aligned_cloud_->size());
 
-        pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> normal_estimator;
+        pcl::NormalEstimation<pcl::PointXYZI, pcl::Normal> normal_estimator;
         pcl::PointCloud<pcl::Normal>::Ptr normals(new pcl::PointCloud<pcl::Normal>);
         normal_estimator.setInputCloud(aligned_cloud_);
         normal_estimator.setRadiusSearch(0.03); // 设置法线估计的搜索半径
         normal_estimator.compute(*normals);
     
         pcl::PointCloud<pcl::Boundary> boundaries;
-        pcl::BoundaryEstimation<pcl::PointXYZ, pcl::Normal, pcl::Boundary> boundary_estimator;
+        pcl::BoundaryEstimation<pcl::PointXYZI, pcl::Normal, pcl::Boundary> boundary_estimator;
         boundary_estimator.setInputCloud(aligned_cloud_);
         boundary_estimator.setInputNormals(normals);
         boundary_estimator.setRadiusSearch(0.03); // 设置边界检测的搜索半径
@@ -160,11 +165,11 @@ public:
         ROS_INFO("Extracted %ld edge points.", edge_cloud_->size());
 
         // 5. 对边缘点进行聚类
-        pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>);
+        pcl::search::KdTree<pcl::PointXYZI>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZI>);
         tree->setInputCloud(edge_cloud_);
     
         std::vector<pcl::PointIndices> cluster_indices;
-        pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
+        pcl::EuclideanClusterExtraction<pcl::PointXYZI> ec;
         ec.setClusterTolerance(0.02); // 设置聚类距离阈值
         ec.setMinClusterSize(50);     // 最小点数
         ec.setMaxClusterSize(1000);   // 最大点数
@@ -181,7 +186,7 @@ public:
         // 对每个聚类进行圆拟合
         for (size_t i = 0; i < cluster_indices.size(); ++i) 
         {
-            pcl::PointCloud<pcl::PointXYZ>::Ptr cluster(new pcl::PointCloud<pcl::PointXYZ>);
+            pcl::PointCloud<pcl::PointXYZI>::Ptr cluster(new pcl::PointCloud<pcl::PointXYZI>);
             for (const auto& idx : cluster_indices[i].indices) {
                 cluster->push_back(edge_cloud_->points[idx]);
             }
@@ -189,7 +194,7 @@ public:
             // 圆拟合
             pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
             pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
-            pcl::SACSegmentation<pcl::PointXYZ> seg;
+            pcl::SACSegmentation<pcl::PointXYZI> seg;
             seg.setOptimizeCoefficients(true);
             seg.setModelType(pcl::SACMODEL_CIRCLE2D);
             seg.setMethodType(pcl::SAC_RANSAC);
@@ -212,7 +217,7 @@ public:
                 error /= inliers->indices.size();
     
                 // 如果拟合误差较小，则认为是一个圆洞
-                if (error < 0.02) 
+                if (error < 0.21) 
                 {
                     // 将恢复后的圆心坐标添加到点云中
                     pcl::PointXYZ center_point;
@@ -236,10 +241,10 @@ public:
     }
 
     // 获取中间结果的点云
-    pcl::PointCloud<pcl::PointXYZ>::Ptr getFilteredCloud() const { return filtered_cloud_; }
-    pcl::PointCloud<pcl::PointXYZ>::Ptr getPlaneCloud() const { return plane_cloud_; }
-    pcl::PointCloud<pcl::PointXYZ>::Ptr getAlignedCloud() const { return aligned_cloud_; }
-    pcl::PointCloud<pcl::PointXYZ>::Ptr getEdgeCloud() const { return edge_cloud_; }
+    pcl::PointCloud<pcl::PointXYZI>::Ptr getFilteredCloud() const { return filtered_cloud_; }
+    pcl::PointCloud<pcl::PointXYZI>::Ptr getPlaneCloud() const { return plane_cloud_; }
+    pcl::PointCloud<pcl::PointXYZI>::Ptr getAlignedCloud() const { return aligned_cloud_; }
+    pcl::PointCloud<pcl::PointXYZI>::Ptr getEdgeCloud() const { return edge_cloud_; }
     pcl::PointCloud<pcl::PointXYZ>::Ptr getCenterZ0Cloud() const { return center_z0_cloud_; }
 };
 

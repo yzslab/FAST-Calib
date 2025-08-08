@@ -24,12 +24,12 @@ using namespace cv;
 class DataPreprocess
 {
 public:
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_input_;
+    pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_input_;
 
     cv::Mat img_input_;
 
     DataPreprocess(Params &params)
-        : cloud_input_(new pcl::PointCloud<pcl::PointXYZ>)
+        : cloud_input_(new pcl::PointCloud<pcl::PointXYZI>)
     {
         string bag_path = params.bag_path;
         string image_path = params.image_path;
@@ -75,10 +75,11 @@ public:
                 cloud_input_->reserve(livox_custom_msg->point_num);
                 for (uint i = 0; i < livox_custom_msg->point_num; ++i) 
                 {
-                    pcl::PointXYZ p;
+                    pcl::PointXYZI p;
                     p.x = livox_custom_msg->points[i].x;
                     p.y = livox_custom_msg->points[i].y;
                     p.z = livox_custom_msg->points[i].z;
+                    p.intensity = livox_custom_msg->points[i].reflectivity;
                     cloud_input_->points.push_back(p);
                 }
             }
@@ -86,7 +87,7 @@ public:
             {
                 // Handle PCL format (Livox and Mechanical LiDAR)
                 auto pcl_msg = m.instantiate<sensor_msgs::PointCloud2>();
-                pcl::PointCloud<pcl::PointXYZ> temp_cloud;
+                pcl::PointCloud<pcl::PointXYZI> temp_cloud;
                 pcl::fromROSMsg(*pcl_msg, temp_cloud);
                 *cloud_input_ += temp_cloud;
             } 
