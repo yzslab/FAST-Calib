@@ -154,7 +154,7 @@ void alignPointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr &input_cloud,
   }
 }
 
-void projectPointCloudToImage(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud,
+void projectPointCloudToImage(const pcl::PointCloud<pcl::PointXYZI>::Ptr& cloud,
   const Eigen::Matrix4f& transformation,
   const cv::Mat& cameraMatrix,
   const cv::Mat& distCoeffs,
