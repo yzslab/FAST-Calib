@@ -17,12 +17,9 @@ int main(int argc, char **argv)
     // 读取参数
     Params params = loadParameters(nh);
 
-    // 初始化 QR 检测和 LiDAR 检测
+    // 初始化 QR 检测
     QRDetectPtr qrDetectPtr;
     qrDetectPtr.reset(new QRDetect(nh, params));
-
-    LidarDetectPtr lidarDetectPtr;
-    lidarDetectPtr.reset(new LidarDetect(nh, params));
 
     DataPreprocessPtr dataPreprocessPtr;
     dataPreprocessPtr.reset(new DataPreprocess(params));
@@ -35,6 +32,45 @@ int main(int argc, char **argv)
     PointCloud<PointXYZ>::Ptr qr_center_cloud(new PointCloud<PointXYZ>);
     qr_center_cloud->reserve(4);
     qrDetectPtr->detect_qr(img_input, qr_center_cloud);
+
+    // 估计标定板的 3D 范围
+    if (params.cameraextrinR.size() > 0 && params.cameraextrinT.size() > 0) {
+      cv::Mat_<float> prior_lidar2camera(4, 4);
+      prior_lidar2camera << params.cameraextrinR[0], params.cameraextrinR[1], params.cameraextrinR[2], params.cameraextrinT[0],
+          params.cameraextrinR[3], params.cameraextrinR[4], params.cameraextrinR[5], params.cameraextrinT[1],
+          params.cameraextrinR[6], params.cameraextrinR[7], params.cameraextrinR[8], params.cameraextrinT[2],
+          0.f, 0.f, 0.f, 1.f;
+      std::cout << "prior_lidar2camera=" << prior_lidar2camera << std::endl;
+
+      cv::Mat prior_camera2lidar;
+      cv::invert(prior_lidar2camera, prior_camera2lidar);
+      std::cout << "prior_camera2lidar=" << prior_camera2lidar << std::endl;
+
+      cv::Mat prior_camera2lidar_R = prior_camera2lidar(cv::Rect(0, 0, 3, 3));
+      cv::Mat prior_camera2lidar_T;
+      cv::repeat(prior_camera2lidar(cv::Rect(3, 0, 1, 3)), 1, 2, prior_camera2lidar_T);
+      std::cout << "prior_camera2lidar_R=" << prior_camera2lidar_R << std::endl;
+      std::cout << "prior_camera2lidar_T=" << prior_camera2lidar_T << std::endl;
+
+      cv::Mat prior_board_bounding_box_in_lidar_space = prior_camera2lidar_R * qrDetectPtr->board_bounding_box_in_camera_space + prior_camera2lidar_T;
+      std::cout << "prior_board_bounding_box_in_lidar_space=" << prior_board_bounding_box_in_lidar_space << std::endl;
+
+      params.x_min = minf(prior_board_bounding_box_in_lidar_space.at<float>(0, 0), prior_board_bounding_box_in_lidar_space.at<float>(0, 1)) - 0.2;
+      params.x_max = maxf(prior_board_bounding_box_in_lidar_space.at<float>(0, 0), prior_board_bounding_box_in_lidar_space.at<float>(0, 1)) + 0.2;
+      params.y_min = minf(prior_board_bounding_box_in_lidar_space.at<float>(1, 0), prior_board_bounding_box_in_lidar_space.at<float>(1, 1)) - 0.2;
+      params.y_max = maxf(prior_board_bounding_box_in_lidar_space.at<float>(1, 0), prior_board_bounding_box_in_lidar_space.at<float>(1, 1)) + 0.2;
+      params.z_min = minf(prior_board_bounding_box_in_lidar_space.at<float>(2, 0), prior_board_bounding_box_in_lidar_space.at<float>(2, 1)) - 0.2;
+      params.z_max = maxf(prior_board_bounding_box_in_lidar_space.at<float>(2, 0), prior_board_bounding_box_in_lidar_space.at<float>(2, 1)) + 0.2;
+
+      std::cout << "x_min=" << params.x_min << ", x_max=" << params.x_max << std::endl;
+      std::cout << "y_min=" << params.y_min << ", y_max=" << params.y_max << std::endl;
+      std::cout << "z_min=" << params.z_min << ", z_max=" << params.z_max << std::endl;
+    }
+
+    // 初始化 LiDAR 检测器
+    LidarDetectPtr lidarDetectPtr;
+    lidarDetectPtr.reset(new LidarDetect(nh, params));
+
 
     // 检测 LiDAR 数据
     PointCloud<PointXYZ>::Ptr lidar_center_cloud(new PointCloud<PointXYZ>);

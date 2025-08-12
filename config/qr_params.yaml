@@ -38,6 +38,9 @@
   circle_radius: 0.12 # Radius of the circle 
 
 # Distance filter
+  # Leave Rcl and Pcl empty if you do not want the filter parameters to be estimated automatically (DO NOT DELETE THEM)
+  Rcl: []
+  Pcl: []
   x_min: 1.5
   x_max: 3.0
   y_min: -1.5

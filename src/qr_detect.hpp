@@ -29,6 +29,7 @@ class QRDetect
     cv::Mat imageCopy_;
     cv::Mat cameraMatrix_;
     cv::Mat distCoeffs_;
+    cv::Mat board_bounding_box_in_camera_space;
 
     QRDetect(ros::NodeHandle &nh, Params& params) 
     {
@@ -242,6 +243,22 @@ class QRDetect
         cv::Mat board_transform = cv::Mat::eye(3, 4, CV_32F);
         R.copyTo(board_transform.rowRange(0, 3).colRange(0, 3));
         t.copyTo(board_transform.rowRange(0, 3).col(3));
+
+        // Compute xyz ranges of the board
+        cv::Mat board_bounding_box = cv::Mat::zeros(4, 2, CV_32F);
+        // top left
+        board_bounding_box.at<float>(0, 0) = boardCorners[0][0].x;
+        board_bounding_box.at<float>(1, 0) = boardCorners[0][0].y;
+        board_bounding_box.at<float>(2, 0) = boardCorners[0][0].z;
+        board_bounding_box.at<float>(3, 0) = 1.0;
+        // bottom right
+        board_bounding_box.at<float>(0, 1) = boardCorners[2][2].x;
+        board_bounding_box.at<float>(1, 1) = boardCorners[2][2].y;
+        board_bounding_box.at<float>(2, 1) = boardCorners[2][2].z;
+        board_bounding_box.at<float>(3, 1) = 1.0;
+        // Transform to camera space
+        board_bounding_box_in_camera_space = board_transform * board_bounding_box;
+        std::cout << "board_bounding_box_in_camera_space=" << board_bounding_box_in_camera_space << std::endl;
 
         // Compute coordintates of circle centers
         for (int i = 0; i < boardCircleCenters.size(); ++i) {

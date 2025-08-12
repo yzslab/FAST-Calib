@@ -215,11 +215,11 @@ public:
                     error += abs(distance);
                 }
                 error /= inliers->indices.size();
-    
+
                 std::cout << "[#" << i << "]error=" << error << std::endl;
     
                 // 如果拟合误差较小，则认为是一个圆洞
-                if (error < 0.02) 
+                if (error < 0.025) 
                 {
                     // 将恢复后的圆心坐标添加到点云中
                     pcl::PointXYZ center_point;
