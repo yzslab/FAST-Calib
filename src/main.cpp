@@ -55,12 +55,14 @@ int main(int argc, char **argv)
       cv::Mat prior_board_bounding_box_in_lidar_space = prior_camera2lidar_R * qrDetectPtr->board_bounding_box_in_camera_space + prior_camera2lidar_T;
       std::cout << "prior_board_bounding_box_in_lidar_space=" << prior_board_bounding_box_in_lidar_space << std::endl;
 
-      params.x_min = minf(prior_board_bounding_box_in_lidar_space.at<float>(0, 0), prior_board_bounding_box_in_lidar_space.at<float>(0, 1)) - 0.2;
-      params.x_max = maxf(prior_board_bounding_box_in_lidar_space.at<float>(0, 0), prior_board_bounding_box_in_lidar_space.at<float>(0, 1)) + 0.2;
-      params.y_min = minf(prior_board_bounding_box_in_lidar_space.at<float>(1, 0), prior_board_bounding_box_in_lidar_space.at<float>(1, 1)) - 0.2;
-      params.y_max = maxf(prior_board_bounding_box_in_lidar_space.at<float>(1, 0), prior_board_bounding_box_in_lidar_space.at<float>(1, 1)) + 0.2;
-      params.z_min = minf(prior_board_bounding_box_in_lidar_space.at<float>(2, 0), prior_board_bounding_box_in_lidar_space.at<float>(2, 1)) - 0.2;
-      params.z_max = maxf(prior_board_bounding_box_in_lidar_space.at<float>(2, 0), prior_board_bounding_box_in_lidar_space.at<float>(2, 1)) + 0.2;
+      std::cout << "uncertain_offset=" << params.uncertain_offset << std::endl;
+
+      params.x_min = minf(prior_board_bounding_box_in_lidar_space.at<float>(0, 0), prior_board_bounding_box_in_lidar_space.at<float>(0, 1)) - params.uncertain_offset;
+      params.x_max = maxf(prior_board_bounding_box_in_lidar_space.at<float>(0, 0), prior_board_bounding_box_in_lidar_space.at<float>(0, 1)) + params.uncertain_offset;
+      params.y_min = minf(prior_board_bounding_box_in_lidar_space.at<float>(1, 0), prior_board_bounding_box_in_lidar_space.at<float>(1, 1)) - params.uncertain_offset;
+      params.y_max = maxf(prior_board_bounding_box_in_lidar_space.at<float>(1, 0), prior_board_bounding_box_in_lidar_space.at<float>(1, 1)) + params.uncertain_offset;
+      params.z_min = minf(prior_board_bounding_box_in_lidar_space.at<float>(2, 0), prior_board_bounding_box_in_lidar_space.at<float>(2, 1)) - params.uncertain_offset;
+      params.z_max = maxf(prior_board_bounding_box_in_lidar_space.at<float>(2, 0), prior_board_bounding_box_in_lidar_space.at<float>(2, 1)) + params.uncertain_offset;
 
       std::cout << "x_min=" << params.x_min << ", x_max=" << params.x_max << std::endl;
       std::cout << "y_min=" << params.y_min << ", y_max=" << params.y_max << std::endl;
@@ -106,12 +108,14 @@ int main(int argc, char **argv)
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr colored_cloud(new pcl::PointCloud<pcl::PointXYZRGB>);
     projectPointCloudToImage(cloud_input, transformation, qrDetectPtr->cameraMatrix_, qrDetectPtr->distCoeffs_, img_input, colored_cloud);
 
-    cloud_input->width = static_cast<uint32_t>(cloud_input->points.size());
-    cloud_input->height = 1;
-    if (pcl::io::savePCDFileASCII(params.output_path + "/cloud_input.pcd", *cloud_input) == 0) 
-    {
-      std::cout << BOLDYELLOW << "[Result] Saved input point cloud to: " << BOLDWHITE << params.output_path << "/cloud_input.pcd" << RESET << std::endl;
-    } 
+    if (params.save) {
+      cloud_input->width = static_cast<uint32_t>(cloud_input->points.size());
+      cloud_input->height = 1;
+      if (pcl::io::savePCDFileASCII(params.output_path + "/cloud_input.pcd", *cloud_input) == 0) 
+      {
+        std::cout << BOLDYELLOW << "[Result] Saved input point cloud to: " << BOLDWHITE << params.output_path << "/cloud_input.pcd" << RESET << std::endl;
+      }
+    }
 
     saveCalibrationResults(params, transformation, colored_cloud, qrDetectPtr->imageCopy_);
 

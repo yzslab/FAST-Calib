@@ -83,10 +83,12 @@ struct Params {
   int min_detected_markers;
   vector<float> cameraextrinT;
   vector<float> cameraextrinR;
+  double uncertain_offset;
   string image_path;
   string bag_path;
   string lidar_topic;
   string output_path;
+  bool save;
 };
 
 // 读取参数
@@ -119,6 +121,8 @@ Params loadParameters(ros::NodeHandle &nh) {
   nh.param("z_max", params.z_max, 2.0);
   nh.param<vector<float>>("Pcl", params.cameraextrinT, vector<float>());
   nh.param<vector<float>>("Rcl", params.cameraextrinR, vector<float>());
+  nh.param("uncertain_offset", params.uncertain_offset, 0.2);
+  nh.param("save", params.save, true);
   return params;
 }
 
@@ -260,13 +264,15 @@ void saveCalibrationResults(const Params& params, const Eigen::Matrix4f& transfo
     std::cerr << BOLDRED << "[Error] Failed to open calib_result.txt for writing!" << RESET << std::endl;
   }
   
-  if (pcl::io::savePCDFileASCII(outputDir + "colored_cloud.pcd", *colored_cloud) == 0) 
-  {
-    std::cout << BOLDYELLOW << "[Result] Saved colored point cloud to: " << BOLDWHITE << outputDir << "colored_cloud.pcd" << RESET << std::endl;
-  } 
-  else 
-  {
-    std::cerr << BOLDRED << "[Error] Failed to save colored point cloud to " << outputDir << "colored_cloud.pcd" << "!" << RESET << std::endl;
+  if (params.save) {
+    if (pcl::io::savePCDFileASCII(outputDir + "colored_cloud.pcd", *colored_cloud) == 0) 
+    {
+      std::cout << BOLDYELLOW << "[Result] Saved colored point cloud to: " << BOLDWHITE << outputDir << "colored_cloud.pcd" << RESET << std::endl;
+    } 
+    else 
+    {
+      std::cerr << BOLDRED << "[Error] Failed to save colored point cloud to " << outputDir << "colored_cloud.pcd" << "!" << RESET << std::endl;
+    }
   }
  
   imwrite(outputDir + "qr_detect.png", img_input);
