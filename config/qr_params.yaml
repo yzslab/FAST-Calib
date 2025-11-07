@@ -41,6 +41,7 @@
   # Leave Rcl and Pcl empty if you do not want the filter parameters to be estimated automatically (DO NOT DELETE THEM)
   Rcl: []
   Pcl: []
+  uncertain_offset: 0.2
   x_min: 1.5
   x_max: 3.0
   y_min: -1.5
