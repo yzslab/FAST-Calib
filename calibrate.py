@@ -7,8 +7,6 @@ import rosbag
 from cv_bridge import CvBridge
 import yaml
 
-IMAGE_TOPIC = "/left_camera/image/compressed"
-
 
 parser = argparse.ArgumentParser()
 parser.add_argument("config")
@@ -16,7 +14,10 @@ parser.add_argument("--bag", type=str, default=None)
 parser.add_argument("--image", type=str, default=None)
 parser.add_argument("--duration", "-d", type=int, default=30)
 parser.add_argument("--name", "-n", type=str, default=None)
+parser.add_argument("--image_topic", "-t", type=str, default="/left_camera/image/compressed")
 args = parser.parse_args()
+
+IMAGE_TOPIC = args.image_topic
 
 if args.bag is None:
     name = args.name
