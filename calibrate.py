@@ -4,7 +4,6 @@ import argparse
 import subprocess
 import cv2
 import rosbag
-from cv_bridge import CvBridge
 import yaml
 
 
@@ -74,20 +73,23 @@ if args.fisheye or config.get("fisheye", False):
     print("Fisheye mode")
 
     distorted_image = cv2.imread(image_file_path)
+    assert distorted_image is not None
 
     import numpy as np
-    import camera_calibration_utils
-    undistorter = camera_calibration_utils.FisheyeCameraUndistorter(
-        DIM=np.asarray([distorted_image.shape[1], distorted_image.shape[0]]),
-        K=np.asarray([
-            [config["fx"], 0., config["cx"]],
-            [0., config["fy"], config["cy"]],
-            [0., 0., 1.],
-        ]),
-        D=np.asarray([config["k1"], config["k2"], config["p1"], config["p2"]]),
-        balance=0,
+
+    K = np.asarray([
+        [config["fx"], 0., config["cx"]],
+        [0., config["fy"], config["cy"]],
+        [0., 0., 1.],
+    ])
+    D = np.asarray([config["k1"], config["k2"], config["p1"], config["p2"]])
+    undistorted_image = cv2.fisheye.undistortImage(
+        distorted_image,
+        K,
+        D,
+        Knew=K,
+        # new_size=(distorted_image.shape[1], distorted_image.shape[0]),
     )
-    undistorted_image = undistorter.undistort(distorted_image)
     undistorted_image_path = os.path.join(os.path.dirname(image_file_path), "image-undistorted.png")
     cv2.imwrite(
         undistorted_image_path,
