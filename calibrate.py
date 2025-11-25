@@ -15,6 +15,7 @@ parser.add_argument("--image", type=str, default=None)
 parser.add_argument("--duration", "-d", type=int, default=30)
 parser.add_argument("--name", "-n", type=str, default=None)
 parser.add_argument("--image_topic", "-t", type=str, default="/left_camera/image/compressed")
+parser.add_argument("--fisheye", action="store_true", default=False)
 args = parser.parse_args()
 
 IMAGE_TOPIC = args.image_topic
@@ -68,6 +69,38 @@ if args.image is None:
 
 with open(args.config, "r") as f:
     config = yaml.safe_load(f)
+
+if args.fisheye or config.get("fisheye", False):
+    print("Fisheye mode")
+
+    distorted_image = cv2.imread(image_file_path)
+
+    import numpy as np
+    import camera_calibration_utils
+    undistorter = camera_calibration_utils.FisheyeCameraUndistorter(
+        DIM=np.asarray([distorted_image.shape[1], distorted_image.shape[0]]),
+        K=np.asarray([
+            [config["fx"], 0., config["cx"]],
+            [0., config["fy"], config["cy"]],
+            [0., 0., 1.],
+        ]),
+        D=np.asarray([config["k1"], config["k2"], config["p1"], config["p2"]]),
+        balance=0,
+    )
+    undistorted_image = undistorter.undistort(distorted_image)
+    undistorted_image_path = os.path.join(os.path.dirname(image_file_path), "image-undistorted.png")
+    cv2.imwrite(
+        undistorted_image_path,
+        undistorted_image,
+    )
+
+    image_file_path = undistorted_image_path
+    config["k1"] = 0.
+    config["k2"] = 0.
+    config["p1"] = 0.
+    config["p2"] = 0.
+
+
 config["bag_path"] = bag_file_path
 config["image_path"] = image_file_path
 config["output_path"] = calibration_output_path
